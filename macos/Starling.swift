@@ -106,16 +106,16 @@ public class Starling : NSObject {
 
   // MARK: - Public API (Playback)
 
-  @objc(playSound:allowOverlap:)
-  public func play(_ sound: SoundIdentifier, allowOverlap: Bool = true) {
+  @objc(playSound:allowOverlap:completionBlock:)
+  public func play(_ sound: SoundIdentifier, allowOverlap: Bool, _ callback: @escaping (Error?) -> Void) {
     DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-      self?.performSoundPlayback(sound, allowOverlap: allowOverlap)
+      self?.performSoundPlayback(sound, allowOverlap: allowOverlap, callback)
     }
   }
 
   // MARK: - Internal Functions
 
-  private func performSoundPlayback(_ sound: SoundIdentifier, allowOverlap: Bool) {
+  private func performSoundPlayback(_ sound: SoundIdentifier, allowOverlap: Bool, _ callback: @escaping (Error?) -> Void) {
     // Note: self is used as the lock pointer here to avoid
     // the possibility of locking on _swiftEmptyDictionaryStorage
     objc_sync_enter(self)
@@ -123,7 +123,7 @@ public class Starling : NSObject {
     objc_sync_exit(self)
 
     guard let audio = file else {
-      handleNonFatalError(StarlingError.invalidSoundIdentifier(name: sound))
+      callback(StarlingError.invalidSoundIdentifier(name: sound))
       return
     }
 
@@ -131,7 +131,7 @@ public class Starling : NSObject {
       guard let player = firstAvailablePlayer() else { return }
 
       objc_sync_enter(players)
-      player.play(audio, identifier: sound)
+      player.play(audio, identifier: sound, callback)
       objc_sync_exit(players)
     }
 
@@ -247,17 +247,18 @@ private class StarlingAudioPlayer {
   let node = AVAudioPlayerNode()
   var state: PlayerState = PlayerState.idle()
 
-  func play(_ file: AVAudioFile, identifier: SoundIdentifier) {
+  func play(_ file: AVAudioFile, identifier: SoundIdentifier, _ callback: @escaping (Error?) -> Void) {
     node.scheduleFile(file, at: nil, completionCallbackType: .dataPlayedBack) {
       [weak self] callbackType in
-      self?.didCompletePlayback(for: identifier)
+      self?.didCompletePlayback(for: identifier, callback)
     }
     state = PlayerState(sound: identifier, status: .playing)
     node.play()
   }
 
-  func didCompletePlayback(for sound: SoundIdentifier) {
+  func didCompletePlayback(for sound: SoundIdentifier, _ callback: (Error?) -> Void) {
     state = PlayerState.idle()
+    callback(nil)
   }
 }
 
