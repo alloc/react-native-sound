@@ -153,11 +153,8 @@ public class Starling : NSObject {
 
     func performPlaybackOnFirstAvailablePlayer() {
       guard let player = firstAvailablePlayer() else { return }
-
-      objc_sync_enter(players)
       player.volume = volume
       player.play(audio, identifier: sound, callback)
-      objc_sync_exit(players)
     }
 
     if allowOverlap {
