@@ -78,21 +78,29 @@ public class Starling : NSObject {
 
   // MARK: - Public API (Loading Sounds)
 
-  @objc(loadSoundFromBundle:withType:forIdentifier:)
-  public func load(resource: String, type: String, for identifier: SoundIdentifier) {
+  @objc(loadSoundFromBundle:withType:forIdentifier:completionBlock:)
+  public func load(resource: String, type: String, for identifier: SoundIdentifier, _ callback: @escaping (Error?) -> Void) {
     if let url = Bundle.main.url(forResource: resource, withExtension: type) {
-      load(sound: url, for: identifier)
+      load(sound: url, for: identifier, callback)
     } else {
-      handleNonFatalError(StarlingError.resourceNotFound(name: "\(resource).\(type)"))
+      callback(StarlingError.resourceNotFound(name: "\(resource).\(type)"))
     }
   }
 
-  @objc(loadSoundFromURL:forIdentifier:)
-  public func load(sound url: URL, for identifier: SoundIdentifier) {
-    if let file = try? AVAudioFile(forReading: url) {
-      didFinishLoadingAudioFile(file, identifier: identifier)
-    } else {
-      handleNonFatalError(StarlingError.audioLoadingFailure)
+  @objc(loadSoundFromURL:forIdentifier:completionBlock:)
+  public func load(sound url: URL, for identifier: SoundIdentifier, _ callback: (Error?) -> Void) {
+    do {
+      let file = try AVAudioFile(forReading: url)
+
+      // Note: self is used as the lock pointer here to avoid
+      // the possibility of locking on _swiftEmptyDictionaryStorage
+      objc_sync_enter(self)
+      files[identifier] = file
+      objc_sync_exit(self)
+
+      callback(nil)
+    } catch {
+      callback(error)
     }
   }
 
