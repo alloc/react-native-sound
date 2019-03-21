@@ -72,7 +72,7 @@ public class Starling : NSObject {
     do {
       try engine.start()
     } catch {
-      handleNonFatalError(error)
+      print("Starling error: \(error)")
     }
   }
 
@@ -202,18 +202,6 @@ public class Starling : NSObject {
     engine.attach(player.node)
     engine.connect(player.node, to: engine.mainMixerNode, format: nil)
     return player
-  }
-
-  private func didFinishLoadingAudioFile(_ file: AVAudioFile, identifier: SoundIdentifier) {
-    // Note: self is used as the lock pointer here to avoid
-    // the possibility of locking on _swiftEmptyDictionaryStorage
-    objc_sync_enter(self)
-    files[identifier] = file
-    objc_sync_exit(self)
-  }
-
-  private func handleNonFatalError(_ error: Error) {
-    print("*** Starling error: \(error)")
   }
 
   // MARK: - Debugging / Diagnostics
