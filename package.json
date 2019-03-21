@@ -1,0 +1,25 @@
+{
+  "name": "@alloc/react-native-sound",
+  "version": "0.1.0",
+  "main": "lib/Sound.js",
+  "description": "Sound effect player for react-native-macos",
+  "repository": "alloc/react-native-sound",
+  "files": [
+    "lib",
+    "macos"
+  ],
+  "scripts": {
+    "build": "tsc -p ."
+  },
+  "peerDependencies": {
+    "react-native-macos": ">=0.19.0"
+  },
+  "devDependencies": {
+    "@types/react": "^16.8.6",
+    "prettier": "^1.16.4",
+    "react-native-macos": "^0.19.0",
+    "tslint": "^5.14.0",
+    "tslint-mango": "^0.1.10",
+    "typescript": "^3.3.4000"
+  }
+}
