@@ -35,7 +35,7 @@ enum StarlingError: Error {
   case audioLoadingFailure
 }
 
-public class Starling {
+public class Starling : NSObject {
 
   /// Defines the number of players which Starling instantiates
   /// during initialization. If more concurrent sounds than this
@@ -57,12 +57,13 @@ public class Starling {
 
   // MARK: - Initializer
 
-  public init() {
+  public override init() {
     assert(Starling.defaultStartingPlayerCount <= Starling.maximumTotalPlayers, "Invalid starting and max audio player counts.")
     assert(Starling.defaultStartingPlayerCount > 0, "Starting audio player count must be > 0.")
 
     players = [StarlingAudioPlayer]()
     files = [String: AVAudioFile]()
+    super.init()
 
     for _ in 0..<Starling.defaultStartingPlayerCount {
       players.append(createNewPlayerAttachedToEngine())
