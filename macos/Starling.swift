@@ -104,6 +104,15 @@ public class Starling : NSObject {
     }
   }
 
+  @objc(unloadSound:)
+  public func unload(sound identifier: SoundIdentifier) {
+    // Note: self is used as the lock pointer here to avoid
+    // the possibility of locking on _swiftEmptyDictionaryStorage
+    objc_sync_enter(self)
+    files[identifier] = nil
+    objc_sync_exit(self)
+  }
+
   // MARK: - Public API (Playback)
 
   @objc(playSound:allowOverlap:completionBlock:)
