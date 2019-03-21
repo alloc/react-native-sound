@@ -115,16 +115,31 @@ public class Starling : NSObject {
 
   // MARK: - Public API (Playback)
 
-  @objc(playSound:allowOverlap:completionBlock:)
-  public func play(_ sound: SoundIdentifier, allowOverlap: Bool, _ callback: @escaping (Error?) -> Void) {
+  @objc(playSound:volume:allowOverlap:completionBlock:)
+  public func play(
+    _ sound: SoundIdentifier,
+    volume: Float,
+    allowOverlap: Bool,
+    _ callback: @escaping (Error?) -> Void
+  ) {
     DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-      self?.performSoundPlayback(sound, allowOverlap: allowOverlap, callback)
+      self?.performSoundPlayback(
+        sound,
+        volume: volume,
+        allowOverlap: allowOverlap,
+        callback
+      )
     }
   }
 
   // MARK: - Internal Functions
 
-  private func performSoundPlayback(_ sound: SoundIdentifier, allowOverlap: Bool, _ callback: @escaping (Error?) -> Void) {
+  private func performSoundPlayback(
+    _ sound: SoundIdentifier,
+    volume: Float,
+    allowOverlap: Bool,
+    _ callback: @escaping (Error?) -> Void
+  ) {
     // Note: self is used as the lock pointer here to avoid
     // the possibility of locking on _swiftEmptyDictionaryStorage
     objc_sync_enter(self)
@@ -140,6 +155,7 @@ public class Starling : NSObject {
       guard let player = firstAvailablePlayer() else { return }
 
       objc_sync_enter(players)
+      player.volume = volume
       player.play(audio, identifier: sound, callback)
       objc_sync_exit(players)
     }
@@ -255,6 +271,7 @@ private struct PlayerState {
 private class StarlingAudioPlayer {
   let node = AVAudioPlayerNode()
   var state: PlayerState = PlayerState.idle()
+  var volume: Float = 1
 
   func play(_ file: AVAudioFile, identifier: SoundIdentifier, _ callback: @escaping (Error?) -> Void) {
     node.scheduleFile(file, at: nil, completionCallbackType: .dataPlayedBack) {
@@ -262,6 +279,7 @@ private class StarlingAudioPlayer {
       self?.didCompletePlayback(for: identifier, callback)
     }
     state = PlayerState(sound: identifier, status: .playing)
+    node.volume = volume
     node.play()
   }
 
