@@ -78,6 +78,7 @@ public class Starling : NSObject {
 
   // MARK: - Public API (Loading Sounds)
 
+  @objc(loadSoundFromBundle:withType:forIdentifier:)
   public func load(resource: String, type: String, for identifier: SoundIdentifier) {
     DispatchQueue.global(qos: .utility).async { [weak self] in
       if let blockSelf = self {
@@ -90,6 +91,7 @@ public class Starling : NSObject {
     }
   }
 
+  @objc(loadSoundFromURL:forIdentifier:)
   public func load(sound url: URL, for identifier: SoundIdentifier) {
     if let file = try? AVAudioFile(forReading: url) {
       didFinishLoadingAudioFile(file, identifier: identifier)
@@ -100,6 +102,7 @@ public class Starling : NSObject {
 
   // MARK: - Public API (Playback)
 
+  @objc(playSound:allowOverlap:)
   public func play(_ sound: SoundIdentifier, allowOverlap: Bool = true) {
     DispatchQueue.global(qos: .userInitiated).async { [weak self] in
       self?.performSoundPlayback(sound, allowOverlap: allowOverlap)
