@@ -67,6 +67,7 @@ public class Starling : NSObject {
     }
 
     do {
+      let _ = engine.mainMixerNode
       try engine.start()
     } catch {
       print("Starling error: \(error)")
@@ -125,6 +126,9 @@ public class Starling : NSObject {
     func performPlaybackOnFirstAvailablePlayer() {
       guard let player = firstAvailablePlayer() else { return }
 
+      // Ensure the player node has the correct format.
+      engine.connect(player.node, to: engine.mainMixerNode, format: sound!.format)
+
       player.volume = volume
       player.play(sound!, for: identifier, callback)
     }
@@ -172,7 +176,6 @@ public class Starling : NSObject {
   private func createNewPlayerAttachedToEngine() -> StarlingAudioPlayer {
     let player = StarlingAudioPlayer()
     engine.attach(player.node)
-    engine.connect(player.node, to: engine.mainMixerNode, format: nil)
     return player
   }
 
