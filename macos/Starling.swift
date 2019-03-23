@@ -178,32 +178,6 @@ public class Starling : NSObject {
     engine.attach(player.node)
     return player
   }
-
-  // MARK: - Debugging / Diagnostics
-
-  private var diagnosticTimer: Timer? = nil
-  public func beginPeriodicDiagnostics() {
-    guard diagnosticTimer == nil else { return }
-    diagnosticTimer = Timer.scheduledTimer(timeInterval: 1.0, target: self, selector: #selector(diagnosticTimerFire(_:)), userInfo: nil, repeats: true)
-  }
-
-  public func stopDiagnostics() {
-    diagnosticTimer?.invalidate()
-    diagnosticTimer = nil
-  }
-
-  @objc private func diagnosticTimerFire(_ timer: Timer) {
-    print("****** Starling Debug Info ******")
-    print("Audio files loaded: \(files.count)")
-    objc_sync_enter(players)
-    print("Total living players: \(players.count)")
-    print("Currently playing: \(players.filter({ $0.state.status != .idle }).count)")
-    for (index, player) in players.enumerated() {
-      print("Player \(index): \(player.state.status == .idle ? "Idle" : "Playing \(player.state.sound ?? "(Null)")")")
-    }
-    print("\n")
-    objc_sync_exit(players)
-  }
 }
 
 /// The internal playback status. This is somewhat redundant at the moment given that
