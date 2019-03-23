@@ -53,6 +53,7 @@ public class Starling : NSObject {
 
   private var players: [StarlingAudioPlayer]
   private var files: [String: AVAudioFile]
+  private var buffers: [String: AVAudioPCMBuffer]
   private let engine = AVAudioEngine()
 
   // MARK: - Initializer
@@ -63,6 +64,7 @@ public class Starling : NSObject {
 
     players = [StarlingAudioPlayer]()
     files = [String: AVAudioFile]()
+    buffers = [String: AVAudioPCMBuffer]()
     super.init()
 
     for _ in 0..<Starling.defaultStartingPlayerCount {
@@ -104,12 +106,24 @@ public class Starling : NSObject {
     }
   }
 
+  @objc(loadSoundFromData:withFormat:forIdentifier:)
+  public func load(sound data: Data, format: AVAudioFormat, for identifier: SoundIdentifier) {
+    let buffer = data.toPCMBuffer(format: format)
+
+    // Note: self is used as the lock pointer here to avoid
+    // the possibility of locking on _swiftEmptyDictionaryStorage
+    objc_sync_enter(self)
+    buffers[identifier] = buffer
+    objc_sync_exit(self)
+  }
+
   @objc(unloadSound:)
   public func unload(sound identifier: SoundIdentifier) {
     // Note: self is used as the lock pointer here to avoid
     // the possibility of locking on _swiftEmptyDictionaryStorage
     objc_sync_enter(self)
     files[identifier] = nil
+    buffers[identifier] = nil
     objc_sync_exit(self)
   }
 
@@ -144,9 +158,10 @@ public class Starling : NSObject {
     // the possibility of locking on _swiftEmptyDictionaryStorage
     objc_sync_enter(self)
     let file = files[sound]
+    let buffer = buffers[sound]
     objc_sync_exit(self)
 
-    guard let audio = file else {
+    if file == nil && buffer == nil {
       callback(StarlingError.invalidSoundIdentifier(name: sound))
       return
     }
@@ -154,7 +169,12 @@ public class Starling : NSObject {
     func performPlaybackOnFirstAvailablePlayer() {
       guard let player = firstAvailablePlayer() else { return }
       player.volume = volume
-      player.play(audio, identifier: sound, callback)
+
+      if let audio = file {
+        player.play(audio, identifier: sound, callback)
+      } else if let audio = buffer {
+        player.play(audio, identifier: sound, callback)
+      }
     }
 
     if allowOverlap {
@@ -268,6 +288,16 @@ private class StarlingAudioPlayer {
     node.play()
   }
 
+  func play(_ buffer: AVAudioPCMBuffer, identifier: SoundIdentifier, _ callback: @escaping (Error?) -> Void) {
+    node.scheduleBuffer(buffer, at: nil, completionCallbackType: .dataPlayedBack) {
+      [weak self] callbackType in
+      self?.didCompletePlayback(for: identifier, callback)
+    }
+    state = PlayerState(sound: identifier, status: .playing)
+    node.volume = volume
+    node.play()
+  }
+
   func didCompletePlayback(for sound: SoundIdentifier, _ callback: (Error?) -> Void) {
     state = PlayerState.idle()
     callback(nil)
@@ -284,5 +314,26 @@ extension StarlingError: CustomStringConvertible {
     case .audioLoadingFailure:
       return "Could not load audio data"
     }
+  }
+}
+
+extension Data {
+  func toPCMBuffer(format: AVAudioFormat) -> AVAudioPCMBuffer? {
+    let streamDesc = format.streamDescription.pointee
+    let frameCapacity = UInt32(count) / streamDesc.mBytesPerFrame
+    guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCapacity)
+    else { return nil }
+
+    buffer.int16ChannelData!.pointee.withMemoryRebound(to: UInt8.self, capacity: count) {
+        let stream = OutputStream(toBuffer: $0, capacity: self.count)
+        stream.open()
+        _ = self.withUnsafeBytes {
+            stream.write($0, maxLength: self.count)
+        }
+        stream.close()
+    }
+
+    buffer.frameLength = frameCapacity
+    return buffer
   }
 }
