@@ -1,8 +1,8 @@
 # @alloc/react-native-sound
 
-### 🚧 Under construction
-
 Sound effect player for [react-native-macos](https://github.com/ptmt/react-native-macos)
+
+Compatible with __macOS 10.13+__ only.
 
 ```ts
 import {Sound} from '@alloc/react-native-sound'
@@ -38,7 +38,7 @@ foo.dispose()
 
 ## Notes
 
-Works on macOS 10.13+
+⚠️  Audio must be `.wav` format (48kHz 32bit)
 
 Thanks to [Starling](https://github.com/matthewreagan/Starling) for providing much of the native implementation.
 
