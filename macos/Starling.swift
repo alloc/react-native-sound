@@ -30,8 +30,7 @@ public typealias SoundIdentifier = String
 
 /// Errors specific to Starling's loading or playback functions
 enum StarlingError: Error {
-  case resourceNotFound(name: String)
-  case invalidSoundIdentifier(name: String)
+  case invalidSoundIdentifier(_ name: String)
   case audioLoadingFailure
 }
 
@@ -51,9 +50,8 @@ public class Starling : NSObject {
 
  // MARK: - Internal Properties
 
-  private var players: [StarlingAudioPlayer]
-  private var files: [String: AVAudioFile]
-  private var buffers: [String: AVAudioPCMBuffer]
+  private var players = [StarlingAudioPlayer]()
+  private var sounds = [String: AVAudioPCMBuffer]()
   private let engine = AVAudioEngine()
 
   // MARK: - Initializer
@@ -62,9 +60,6 @@ public class Starling : NSObject {
     assert(Starling.defaultStartingPlayerCount <= Starling.maximumTotalPlayers, "Invalid starting and max audio player counts.")
     assert(Starling.defaultStartingPlayerCount > 0, "Starting audio player count must be > 0.")
 
-    players = [StarlingAudioPlayer]()
-    files = [String: AVAudioFile]()
-    buffers = [String: AVAudioPCMBuffer]()
     super.init()
 
     for _ in 0..<Starling.defaultStartingPlayerCount {
@@ -78,52 +73,14 @@ public class Starling : NSObject {
     }
   }
 
-  // MARK: - Public API (Loading Sounds)
+  // MARK: - Public API (Adding Sounds)
 
-  @objc(loadSoundFromBundle:withType:forIdentifier:completionBlock:)
-  public func load(resource: String, type: String, for identifier: SoundIdentifier, _ callback: @escaping (Error?) -> Void) {
-    if let url = Bundle.main.url(forResource: resource, withExtension: type) {
-      load(sound: url, for: identifier, callback)
-    } else {
-      callback(StarlingError.resourceNotFound(name: "\(resource).\(type)"))
-    }
-  }
-
-  @objc(loadSoundFromURL:forIdentifier:completionBlock:)
-  public func load(sound url: URL, for identifier: SoundIdentifier, _ callback: (Error?) -> Void) {
-    do {
-      let file = try AVAudioFile(forReading: url)
-
-      // Note: self is used as the lock pointer here to avoid
-      // the possibility of locking on _swiftEmptyDictionaryStorage
-      objc_sync_enter(self)
-      files[identifier] = file
-      objc_sync_exit(self)
-
-      callback(nil)
-    } catch {
-      callback(error)
-    }
-  }
-
-  @objc(loadSoundFromData:withFormat:forIdentifier:)
-  public func load(sound data: Data, format: AVAudioFormat, for identifier: SoundIdentifier) {
-    let buffer = data.toPCMBuffer(format: format)
-
+  @objc(setSound:forIdentifier:)
+  public func set(sound: AVAudioPCMBuffer?, for identifier: SoundIdentifier) {
     // Note: self is used as the lock pointer here to avoid
     // the possibility of locking on _swiftEmptyDictionaryStorage
     objc_sync_enter(self)
-    buffers[identifier] = buffer
-    objc_sync_exit(self)
-  }
-
-  @objc(unloadSound:)
-  public func unload(sound identifier: SoundIdentifier) {
-    // Note: self is used as the lock pointer here to avoid
-    // the possibility of locking on _swiftEmptyDictionaryStorage
-    objc_sync_enter(self)
-    files[identifier] = nil
-    buffers[identifier] = nil
+    sounds[identifier] = sound
     objc_sync_exit(self)
   }
 
@@ -149,7 +106,7 @@ public class Starling : NSObject {
   // MARK: - Internal Functions
 
   private func performSoundPlayback(
-    _ sound: SoundIdentifier,
+    _ identifier: SoundIdentifier,
     volume: Float,
     allowOverlap: Bool,
     _ callback: @escaping (Error?) -> Void
@@ -157,30 +114,25 @@ public class Starling : NSObject {
     // Note: self is used as the lock pointer here to avoid
     // the possibility of locking on _swiftEmptyDictionaryStorage
     objc_sync_enter(self)
-    let file = files[sound]
-    let buffer = buffers[sound]
+    let sound = sounds[identifier]
     objc_sync_exit(self)
 
-    if file == nil && buffer == nil {
-      callback(StarlingError.invalidSoundIdentifier(name: sound))
+    if sound == nil {
+      callback(StarlingError.invalidSoundIdentifier(identifier))
       return
     }
 
     func performPlaybackOnFirstAvailablePlayer() {
       guard let player = firstAvailablePlayer() else { return }
-      player.volume = volume
 
-      if let audio = file {
-        player.play(audio, identifier: sound, callback)
-      } else if let audio = buffer {
-        player.play(audio, identifier: sound, callback)
-      }
+      player.volume = volume
+      player.play(sound!, for: identifier, callback)
     }
 
     if allowOverlap {
        performPlaybackOnFirstAvailablePlayer()
     } else {
-      if !soundIsCurrentlyPlaying(sound) {
+      if !soundIsCurrentlyPlaying(identifier) {
         performPlaybackOnFirstAvailablePlayer()
       }
     }
@@ -278,17 +230,7 @@ private class StarlingAudioPlayer {
   var state: PlayerState = PlayerState.idle()
   var volume: Float = 1
 
-  func play(_ file: AVAudioFile, identifier: SoundIdentifier, _ callback: @escaping (Error?) -> Void) {
-    node.scheduleFile(file, at: nil, completionCallbackType: .dataPlayedBack) {
-      [weak self] callbackType in
-      self?.didCompletePlayback(for: identifier, callback)
-    }
-    state = PlayerState(sound: identifier, status: .playing)
-    node.volume = volume
-    node.play()
-  }
-
-  func play(_ buffer: AVAudioPCMBuffer, identifier: SoundIdentifier, _ callback: @escaping (Error?) -> Void) {
+  func play(_ buffer: AVAudioPCMBuffer, for identifier: SoundIdentifier, _ callback: @escaping (Error?) -> Void) {
     node.scheduleBuffer(buffer, at: nil, completionCallbackType: .dataPlayedBack) {
       [weak self] callbackType in
       self?.didCompletePlayback(for: identifier, callback)
@@ -298,7 +240,7 @@ private class StarlingAudioPlayer {
     node.play()
   }
 
-  func didCompletePlayback(for sound: SoundIdentifier, _ callback: (Error?) -> Void) {
+  func didCompletePlayback(for identifier: SoundIdentifier, _ callback: (Error?) -> Void) {
     state = PlayerState.idle()
     callback(nil)
   }
@@ -307,8 +249,6 @@ private class StarlingAudioPlayer {
 extension StarlingError: CustomStringConvertible {
   var description: String {
     switch self {
-    case .resourceNotFound(let name):
-      return "Resource not found '\(name)'"
     case .invalidSoundIdentifier(let name):
       return "Invalid identifier. No sound loaded named '\(name)'"
     case .audioLoadingFailure:
