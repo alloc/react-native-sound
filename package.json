@@ -1,6 +1,6 @@
 {
   "name": "@alloc/react-native-sound",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "main": "lib/Sound.js",
   "description": "Sound effect player for react-native-macos",
   "repository": "alloc/react-native-sound",
