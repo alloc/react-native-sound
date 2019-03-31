@@ -68,6 +68,21 @@ public class Starling : NSObject {
     for _ in 0 ..< Starling.defaultStartingPlayerCount {
       players.append(StarlingAudioPlayer())
     }
+
+    NotificationCenter.default.addObserver(
+      forName: .ComponentInstanceInvalidation,
+      object: nil,
+      queue: nil,
+      using: componentInstanceInvalidated
+    )
+  }
+
+  deinit {
+    NotificationCenter.default.removeObserver(
+      componentInstanceInvalidated,
+      name: .ComponentInstanceInvalidation,
+      object: nil
+    )
   }
 
   // MARK: - Public API (Adding Sounds)
@@ -101,6 +116,11 @@ public class Starling : NSObject {
   }
 
   // MARK: - Internal Functions
+
+  private func componentInstanceInvalidated(notification: Notification) {
+    let unit = notification.object as? AUAudioUnit
+    print("AUAudioUnit crashed: \(unit?.debugDescription ?? notification.debugDescription)")
+  }
 
   private func performSoundPlayback(
     _ identifier: SoundIdentifier,
@@ -252,4 +272,10 @@ extension Data {
     buffer.frameLength = frameCapacity
     return buffer
   }
+}
+
+extension Notification.Name {
+  static let ComponentInstanceInvalidation = Notification.Name(
+    rawValue: kAudioComponentInstanceInvalidationNotification as String
+  )
 }
