@@ -237,19 +237,16 @@ extension StarlingError: CustomStringConvertible {
 }
 
 extension Data {
+  // Taken from: https://stackoverflow.com/a/52731480/2228559
   func toPCMBuffer(format: AVAudioFormat) -> AVAudioPCMBuffer? {
     let streamDesc = format.streamDescription.pointee
     let frameCapacity = UInt32(count) / streamDesc.mBytesPerFrame
     guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCapacity)
     else { return nil }
 
-    buffer.int16ChannelData!.pointee.withMemoryRebound(to: UInt8.self, capacity: count) {
-        let stream = OutputStream(toBuffer: $0, capacity: self.count)
-        stream.open()
-        _ = self.withUnsafeBytes {
-            stream.write($0, maxLength: self.count)
-        }
-        stream.close()
+    let samples = buffer.audioBufferList.pointee.mBuffers
+    self.withUnsafeBytes { addr in
+      samples.mData?.copyMemory(from: addr, byteCount: Int(samples.mDataByteSize))
     }
 
     buffer.frameLength = frameCapacity
