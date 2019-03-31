@@ -78,6 +78,7 @@ public class Starling : NSObject {
   }
 
   deinit {
+    engine.stop()
     NotificationCenter.default.removeObserver(
       componentInstanceInvalidated,
       name: .ComponentInstanceInvalidation,
