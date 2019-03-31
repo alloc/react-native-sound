@@ -62,15 +62,11 @@ public class Starling : NSObject {
 
     super.init()
 
-    for _ in 0..<Starling.defaultStartingPlayerCount {
-      players.append(createNewPlayerAttachedToEngine())
-    }
+    let _ = engine.mainMixerNode
+    engine.prepare()
 
-    do {
-      let _ = engine.mainMixerNode
-      try engine.start()
-    } catch {
-      print("Starling error: \(error)")
+    for _ in 0 ..< Starling.defaultStartingPlayerCount {
+      players.append(StarlingAudioPlayer())
     }
   }
 
@@ -126,15 +122,27 @@ public class Starling : NSObject {
     func performPlaybackOnFirstAvailablePlayer() {
       guard let player = firstAvailablePlayer() else { return }
 
+      if player.node.engine == nil {
+        engine.attach(player.node)
+      }
+
       // Ensure the player node has the correct format.
       engine.connect(player.node, to: engine.mainMixerNode, format: sound!.format)
+
+      do {
+        // Ensure the audio engine is running.
+        try engine.start()
+      } catch {
+        print("AVAudioEngine failed to start: \(error)")
+        return
+      }
 
       player.volume = volume
       player.play(sound!, for: identifier, callback)
     }
 
     if allowOverlap {
-       performPlaybackOnFirstAvailablePlayer()
+      performPlaybackOnFirstAvailablePlayer()
     } else {
       if !soundIsCurrentlyPlaying(identifier) {
         performPlaybackOnFirstAvailablePlayer()
@@ -161,21 +169,14 @@ public class Starling : NSObject {
     let player: StarlingAudioPlayer? = {
       // TODO: A better solution would be to actively manage a pool of available player references
       // For almost every general use case of this library, however, this performance penalty is trivial
-      let player = players.first(where: { $0.state.status == .idle })
+      var player = players.first(where: { $0.state.status == .idle })
       if player == nil && players.count < Starling.maximumTotalPlayers {
-        let newPlayer = createNewPlayerAttachedToEngine()
-        players.append(newPlayer)
-        return newPlayer
+        player = StarlingAudioPlayer()
+        players.append(player!)
       }
       return player
     }()
 
-    return player
-  }
-
-  private func createNewPlayerAttachedToEngine() -> StarlingAudioPlayer {
-    let player = StarlingAudioPlayer()
-    engine.attach(player.node)
     return player
   }
 }
@@ -204,10 +205,11 @@ private struct PlayerState {
 
 private class StarlingAudioPlayer {
   let node = AVAudioPlayerNode()
-  var state: PlayerState = PlayerState.idle()
+  var state: PlayerState = .idle()
   var volume: Float = 1
 
   func play(_ buffer: AVAudioPCMBuffer, for identifier: SoundIdentifier, _ callback: @escaping (Error?) -> Void) {
+    assert(node.engine?.isRunning == true, "Not attached to a running engine")
     node.scheduleBuffer(buffer, at: nil, completionCallbackType: .dataPlayedBack) {
       [weak self] callbackType in
       self?.didCompletePlayback(for: identifier, callback)
