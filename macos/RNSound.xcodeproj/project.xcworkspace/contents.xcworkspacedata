@@ -2,6 +2,6 @@
 <Workspace
    version = "1.0">
    <FileRef
-      location = "self:/Users/alec/dev/react-native/sound/macos/RNSound.xcodeproj">
+      location = "self:">
    </FileRef>
 </Workspace>
